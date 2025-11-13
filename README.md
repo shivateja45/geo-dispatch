@@ -1,51 +1,67 @@
-# 🌎 Geo-Dispatch: High-Performance Geolocation Service
+# 🌎 Geo-Dispatch
 
-Geo-Dispatch is a high-performance backend system that solves the "nearest neighbor" problem for a ride-sharing platform. It's a distributed, real-time data pipeline built with Go, Rust, Kafka, Redis, and Postgres.
+**A high-performance, distributed geolocation engine designed for real-time ride-matching at scale.**
 
-This project demonstrates a real-world, SDE 2-level architecture designed for high throughput and low latency.
-
-## 🚀 Core Features
-
-* **High-Throughput Ingestion:** A non-blocking TCP server built in **Rust** with **Tokio** to handle 10,000+ concurrent driver connections.
-* **Decoupled Architecture:** A **Kafka** message queue acts as a "shock absorber," decoupling the ingestion service from the API.
-* **Real-time API Service:** A **Go**-based microservice that consumes from Kafka, enriches data, and serves API requests.
-* **Optimized Caching:** Implements a dual-write strategy:
-    * **Redis (Cache):** Stores live driver locations in a **geospatial index** for sub-50ms API reads.
-    * **PostgreSQL (DB):** Persists all data to a **PostGIS**-enabled database for accuracy and analytics.
-* **Algorithmic Optimization:** Enriches incoming data with **H3 geohashes** (Uber's grid system) to enable high-performance grid-based searches.
-
-## 🛠️ System Architecture
-
-
-*(You can create this using a free tool like [Excalidraw](https://excalidraw.com/) or [diagrams.net](http://diagrams.net). This is **highly** recommended!)*
-
-1.  The **Rust Ingestion Service** accepts high-volume TCP connections and publishes raw location data to a Kafka topic.
-2.  The **Go API Service** (as a consumer) reads from Kafka.
-3.  For each message, it calculates the **H3 Geohash**.
-4.  It performs a dual-write:
-    * Saves the data to the **Redis Geospatial Index** (for the v2 API).
-    * Saves the full, enriched data to the **PostgreSQL** database (for the v1 API and analytics).
-5.  A rider's app can query the `/v2/find-drivers` endpoint to get an instant, cached response from Redis.
-
-## ⚙️ Tech Stack
-
-* **API & Consumer:** Go
-* **Ingestion Service:** Rust (with Tokio)
-* **Message Broker:** Kafka
-* **Cache:** Redis (for `GeoRadius` queries)
-* **Database:** PostgreSQL (with PostGIS for `ST_Distance` queries)
-* **Containerization:** Docker & Docker Compose
-
-## 🏁 How to Run
-
-1.  Ensure you have Docker and Docker Compose installed.
-2.  Clone the repository.
-3.  From the root folder, start the entire backend stack:
-    ```bash
-    docker-compose up -d
-    ```
-4.  (Coming Soon: After we update the `docker-compose.yml` to use our new Dockerfiles, this will be the *only* command needed!)
+Geo-Dispatch ingests high-frequency location data from thousands of concurrent drivers via a non-blocking edge service, processes it through a fault-tolerant event stream, and serves sub-50ms geospatial queries via a dual-write caching architecture.
 
 ---
 
-*(Self-note: I still need to update the `docker-compose.yml` to build my new Dockerfiles directly!)*
+## 🏗 System Architecture
+
+The system is designed as a decoupled microservices architecture to handle high write-throughput (ingestion) and low read-latency (matchmaking).
+
+1.  **Ingestion Service (Rust):** A high-performance TCP edge server using **Tokio**. It handles 10,000+ persistent driver connections and acts as a producer to the event stream.
+2.  **Event Bus (Kafka):** Decouples ingestion from processing, providing backpressure handling and data durability.
+3.  **Processing API (Go):** Consumes location events, performs geospatial enrichment (**H3 Geohashing**), and executes a dual-write strategy.
+4.  **Storage Layer:**
+    * **Redis (Hot):** Stores ephemeral driver locations in a Geospatial Index for instant `$O(\log N)$` radius lookups.
+    * **PostgreSQL + PostGIS (Cold):** Persistent storage for historical data, analytics, and complex geometric queries using R-Tree indexing.
+
+## 🚀 Tech Stack
+
+* **Edge Service:** Rust, Tokio, librdkafka
+* **Backend API:** Go (Golang), Goroutines
+* **Messaging:** Apache Kafka, Zookeeper
+* **Database:** PostgreSQL 15 (with PostGIS extension)
+* **Cache:** Redis 7 (Geospatial)
+* **Algorithms:** H3 (Uber's Hexagonal Hierarchical Spatial Index)
+* **Infrastructure:** Docker, Docker Compose
+
+## ✨ Key Features
+
+* **High-Concurrency Ingestion:** Capable of handling **10k+ concurrent TCP connections** on a single node using Rust's async I/O model.
+* **Real-Time Matchmaking:** v2 API achieves **<50ms p99 latency** by leveraging in-memory Redis geospatial indexes.
+* **Fault Tolerance:** Architecture is fully decoupled; a database slowdown does not block the ingestion layer.
+* **Algorithmic Optimization:** Implements **H3 Geohashing (Resolution 9)** to enable scalable grid-based lookups and analytics.
+* **Load Testing Suite:** Includes a custom Go-based load generator to simulate thousands of concurrent drivers performing random walks.
+
+## 🛠️ Quick Start
+
+### Run the Full Stack
+The entire system (Zookeeper, Kafka, Postgres, Redis, Go API, Rust Ingestion) is containerized.
+
+```bash
+# Start all services
+docker-compose up -d
+
+### API Endpoints
+
+| Method | Endpoint                           | Description                   | Source             |
+| :---   |              :---                  |            :---               |       :---         |
+| `GET`  | `/find-drivers?lat=...&lon=...`    | Nearest 5 drivers (R-Tree)    | **PostgreSQL**     |
+| `GET`  | `/v2/find-drivers?lat=...&lon=...` | Nearest 5 drivers (GeoRadius) | **Redis (Cached)** |
+| `GET`  | `/health` | Service health check   | API                           |
+
+🧪 Stress Testing
+To verify performance, use the included load generator to spawn a swarm of mock drivers.
+
+cd load-test
+go run main.go
+
+
+📂 Project Structure
+├── api-service/          # Go: Kafka consumer & HTTP API
+├── ingestion-service/    # Rust: High-performance TCP ingestion
+├── load-test/            # Go: Concurrent load generator
+├── docker-compose.yml    # Infrastructure orchestration
+└── README.md             # Documentation

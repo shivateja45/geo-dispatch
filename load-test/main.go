@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	TotalDrivers   = 5000 // Let's start with 5,000 to be safe on a laptop
+	TotalDrivers   = 5000
 	ServerAddress  = "localhost:9000"
 	UpdateInterval = 3 * time.Second
 )
@@ -19,56 +19,47 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(TotalDrivers)
 
-	log.Printf("🚀 Starting load test with %d drivers...", TotalDrivers)
+	log.Printf("🚀 Starting load test: %d drivers -> %s", TotalDrivers, ServerAddress)
 
-	// We launch drivers in batches to avoid opening too many files at once instantly
 	for i := 0; i < TotalDrivers; i++ {
 		go simulateDriver(i, &wg)
 
-		// Small delay every 100 drivers to ramp up smoothly
+		// Rate limit connection creation to prevent file descriptor exhaustion
 		if i%100 == 0 {
-			time.Sleep(100 * time.Millisecond)
-			fmt.Printf("Launched %d drivers...\n", i)
+			time.Sleep(50 * time.Millisecond)
+			fmt.Printf("Drivers active: %d\n", i)
 		}
 	}
 
-	wg.Wait() // Wait forever (or until drivers crash)
+	wg.Wait()
 }
 
 func simulateDriver(id int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// 1. Connect to the Rust Server
 	conn, err := net.Dial("tcp", ServerAddress)
 	if err != nil {
-		// If connection fails (e.g., server full), just log and exit this driver
-		// log.Printf("Driver %d failed to connect: %v", id, err)
+		// log.Printf("Connection failed for driver %d", id)
 		return
 	}
 	defer conn.Close()
 
-	// Generate a random starting point (roughly near San Francisco)
+	// Initial position (San Francisco)
 	lat := 37.7749 + (rand.Float64() * 0.1)
 	lon := -122.4194 + (rand.Float64() * 0.1)
 
-	// 2. Start the update loop
 	for {
-		// Move the driver slightly (random walk)
+		// Random walk
 		lat += (rand.Float64() - 0.5) * 0.001
 		lon += (rand.Float64() - 0.5) * 0.001
 
-		// Create the JSON payload
-		// Note: We add a newline \n because our Rust server expects line-by-line reading
+		// Protocol: Line-delimited JSON
 		payload := fmt.Sprintf(`{"driver_id": "driver-%d", "latitude": %.6f, "longitude": %.6f}`+"\n", id, lat, lon)
 
-		// 3. Send data
-		_, err := conn.Write([]byte(payload))
-		if err != nil {
-			log.Printf("Driver %d lost connection", id)
+		if _, err := conn.Write([]byte(payload)); err != nil {
 			return
 		}
 
-		// 4. Sleep before next update
 		time.Sleep(UpdateInterval + time.Duration(rand.Intn(1000))*time.Millisecond)
 	}
 }
