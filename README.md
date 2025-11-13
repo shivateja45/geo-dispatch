@@ -43,6 +43,7 @@ The entire system (Zookeeper, Kafka, Postgres, Redis, Go API, Rust Ingestion) is
 ```bash
 # Start all services
 docker-compose up -d
+```
 
 ### API Endpoints
 
