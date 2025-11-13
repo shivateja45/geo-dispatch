@@ -53,16 +53,4 @@ docker-compose up -d
 | `GET`  | `/v2/find-drivers?lat=...&lon=...` | Nearest 5 drivers (GeoRadius) | **Redis (Cached)** |
 | `GET`  | `/health` | Service health check   | API                           |
 
-🧪 Stress Testing
-To verify performance, use the included load generator to spawn a swarm of mock drivers.
 
-cd load-test
-go run main.go
-
-
-📂 Project Structure
-├── api-service/          # Go: Kafka consumer & HTTP API
-├── ingestion-service/    # Rust: High-performance TCP ingestion
-├── load-test/            # Go: Concurrent load generator
-├── docker-compose.yml    # Infrastructure orchestration
-└── README.md             # Documentation
