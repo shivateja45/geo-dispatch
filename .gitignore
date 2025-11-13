@@ -1,0 +1,20 @@
+# --- Rust ---
+/ingestion-service/target/
+/ingestion-service/Cargo.lock
+**/*.rs.bk
+
+# --- Go ---
+/api-service/geodispatch-api
+/load-test/load-test
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# --- MacOS Garbage ---
+.DS_Store
+
+# --- Docker ---
+postgres_data/

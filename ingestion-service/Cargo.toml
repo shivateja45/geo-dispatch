@@ -1,0 +1,12 @@
+[package]
+name = "ingestion-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# This is the async runtime (like Go's goroutines)
+tokio = { version = "1", features = ["full"] }
+
+# This is the Rust wrapper for the same C library (librdkafka)
+# that our Go app uses.
+rdkafka = "0.36"
